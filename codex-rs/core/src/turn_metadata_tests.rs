@@ -2,62 +2,18 @@ use super::*;
 
 use serde_json::Value;
 use tempfile::TempDir;
-use tokio::process::Command;
 
 #[tokio::test]
-async fn build_turn_metadata_header_includes_has_changes_for_clean_repo() {
+async fn build_turn_metadata_header_only_includes_sandbox() {
     let temp_dir = TempDir::new().expect("temp dir");
-    let repo_path = temp_dir.path().join("repo");
-    std::fs::create_dir_all(&repo_path).expect("create repo");
-
-    Command::new("git")
-        .args(["init"])
-        .current_dir(&repo_path)
-        .output()
-        .await
-        .expect("git init");
-    Command::new("git")
-        .args(["config", "user.name", "Test User"])
-        .current_dir(&repo_path)
-        .output()
-        .await
-        .expect("git config user.name");
-    Command::new("git")
-        .args(["config", "user.email", "test@example.com"])
-        .current_dir(&repo_path)
-        .output()
-        .await
-        .expect("git config user.email");
-
-    std::fs::write(repo_path.join("README.md"), "hello").expect("write file");
-    Command::new("git")
-        .args(["add", "."])
-        .current_dir(&repo_path)
-        .output()
-        .await
-        .expect("git add");
-    Command::new("git")
-        .args(["commit", "-m", "initial"])
-        .current_dir(&repo_path)
-        .output()
-        .await
-        .expect("git commit");
-
-    let header = build_turn_metadata_header(&repo_path, Some("none"))
+    let header = build_turn_metadata_header(temp_dir.path(), Some("none"))
         .await
         .expect("header");
     let parsed: Value = serde_json::from_str(&header).expect("valid json");
-    let workspace = parsed
-        .get("workspaces")
-        .and_then(Value::as_object)
-        .and_then(|workspaces| workspaces.values().next())
-        .cloned()
-        .expect("workspace");
 
-    assert_eq!(
-        workspace.get("has_changes").and_then(Value::as_bool),
-        Some(false)
-    );
+    assert_eq!(parsed.get("sandbox").and_then(Value::as_str), Some("none"));
+    assert!(parsed.get("workspaces").is_none());
+    assert!(parsed.get("session_id").is_none());
 }
 
 #[test]
@@ -77,9 +33,8 @@ fn turn_metadata_state_uses_platform_sandbox_tag() {
     let header = state.current_header_value().expect("header");
     let json: Value = serde_json::from_str(&header).expect("json");
     let sandbox_name = json.get("sandbox").and_then(Value::as_str);
-    let session_id = json.get("session_id").and_then(Value::as_str);
 
     let expected_sandbox = sandbox_tag(&sandbox_policy, WindowsSandboxLevel::Disabled);
     assert_eq!(sandbox_name, Some(expected_sandbox));
-    assert_eq!(session_id, Some("session-a"));
+    assert!(json.get("session_id").is_none());
 }

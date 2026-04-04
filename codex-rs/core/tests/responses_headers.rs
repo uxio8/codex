@@ -1,4 +1,3 @@
-use std::process::Command;
 use std::sync::Arc;
 
 use codex_core::ModelClient;
@@ -377,7 +376,7 @@ async fn responses_respects_model_info_overrides_from_config() {
 }
 
 #[tokio::test]
-async fn responses_stream_includes_turn_metadata_header_for_git_workspace_e2e() {
+async fn responses_stream_includes_minimal_turn_metadata_header_e2e() {
     core_test_support::skip_if_no_network!();
 
     let server = responses::start_mock_server().await;
@@ -387,8 +386,6 @@ async fn responses_stream_includes_turn_metadata_header_for_git_workspace_e2e() 
     ]);
 
     let test = test_codex().build(&server).await.expect("build test codex");
-    let cwd = test.cwd_path();
-
     let first_request = responses::mount_sse_once(&server, response_body.clone()).await;
     test.submit_turn("hello")
         .await
@@ -414,48 +411,6 @@ async fn responses_stream_includes_turn_metadata_header_for_git_workspace_e2e() 
             .and_then(serde_json::Value::as_str),
         Some("none")
     );
-
-    let git_config_global = cwd.join("empty-git-config");
-    std::fs::write(&git_config_global, "").expect("write empty git config");
-    let run_git = |args: &[&str]| {
-        let output = Command::new("git")
-            .env("GIT_CONFIG_GLOBAL", &git_config_global)
-            .env("GIT_CONFIG_NOSYSTEM", "1")
-            .args(args)
-            .current_dir(cwd)
-            .output()
-            .expect("git command should run");
-        assert!(
-            output.status.success(),
-            "git {:?} failed: stdout={} stderr={}",
-            args,
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
-        output
-    };
-
-    run_git(&["init"]);
-    run_git(&["config", "user.name", "Test User"]);
-    run_git(&["config", "user.email", "test@example.com"]);
-    std::fs::write(cwd.join("README.md"), "hello").expect("write README");
-    run_git(&["add", "."]);
-    run_git(&["commit", "-m", "initial commit"]);
-    run_git(&[
-        "remote",
-        "add",
-        "origin",
-        "https://github.com/openai/codex.git",
-    ]);
-
-    let expected_head = String::from_utf8(run_git(&["rev-parse", "HEAD"]).stdout)
-        .expect("git rev-parse output should be valid UTF-8")
-        .trim()
-        .to_string();
-    let expected_origin = String::from_utf8(run_git(&["remote", "get-url", "origin"]).stdout)
-        .expect("git remote get-url output should be valid UTF-8")
-        .trim()
-        .to_string();
 
     let first_response = responses::sse(vec![
         responses::ev_response_created("resp-2"),
@@ -522,30 +477,6 @@ async fn responses_stream_includes_turn_metadata_header_for_git_workspace_e2e() 
         Some("none")
     );
 
-    let workspace = second_parsed
-        .get("workspaces")
-        .and_then(serde_json::Value::as_object)
-        .and_then(|workspaces| workspaces.values().next())
-        .cloned()
-        .expect("second request should include git workspace metadata");
-    assert_eq!(
-        workspace
-            .get("latest_git_commit_hash")
-            .and_then(serde_json::Value::as_str),
-        Some(expected_head.as_str())
-    );
-    assert_eq!(
-        workspace
-            .get("associated_remote_urls")
-            .and_then(serde_json::Value::as_object)
-            .and_then(|remotes| remotes.get("origin"))
-            .and_then(serde_json::Value::as_str),
-        Some(expected_origin.as_str())
-    );
-    assert_eq!(
-        workspace
-            .get("has_changes")
-            .and_then(serde_json::Value::as_bool),
-        Some(false)
-    );
+    assert!(second_parsed.get("workspaces").is_none());
+    assert!(second_parsed.get("session_id").is_none());
 }
