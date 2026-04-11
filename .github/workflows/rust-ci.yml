@@ -127,7 +127,7 @@ jobs:
 
   argument_comment_lint_prebuilt:
     name: Argument comment lint - ${{ matrix.name }}
-    runs-on: ${{ matrix.runs_on || matrix.runner }}
+    runs-on: ${{ github.repository == 'openai/codex' && (matrix.runs_on || matrix.runner) || (matrix.fork_runner || matrix.runner) }}
     timeout-minutes: ${{ matrix.timeout_minutes }}
     needs: changed
     if: ${{ needs.changed.outputs.argument_comment_lint == 'true' || needs.changed.outputs.workflows == 'true' }}
@@ -140,9 +140,11 @@ jobs:
             timeout_minutes: 30
           - name: macOS
             runner: macos-15-xlarge
+            fork_runner: macos-15
             timeout_minutes: 30
           - name: Windows
             runner: windows-x64
+            fork_runner: windows-latest
             timeout_minutes: 30
             runs_on:
               group: codex-runners
