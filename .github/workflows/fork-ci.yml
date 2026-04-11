@@ -37,6 +37,11 @@ jobs:
         with:
           components: rustfmt
 
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends pkg-config libcap-dev
+
       - name: Check Rust formatting
         working-directory: codex-rs
         run: cargo fmt -- --config imports_granularity=Item --check
