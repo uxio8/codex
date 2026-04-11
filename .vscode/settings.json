@@ -1,4 +1,6 @@
 {
+    // Force the VS Code ChatGPT/Codex extension to use the local checkout.
+    "chatgpt.cliExecutable": "${workspaceFolder}/scripts/debug-codex.sh",
     "rust-analyzer.checkOnSave": true,
     "rust-analyzer.check.command": "clippy",
     "rust-analyzer.check.extraArgs": ["--tests"],
