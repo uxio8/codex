@@ -1365,7 +1365,7 @@ Codex supports these authentication modes. The current mode is surfaced in `acco
 
 ### API Overview
 
-- `account/read` — fetch current account info; optionally reload managed auth from disk and/or refresh tokens.
+- `account/read` — fetch current account info; optionally reload auth storage and/or refresh tokens.
 - `account/login/start` — begin login (`apiKey`, `chatgpt`, `chatgptDeviceCode`).
 - `account/login/completed` (notify) — emitted when a login attempt finishes (success or error).
 - `account/login/cancel` — cancel a pending managed ChatGPT login by `loginId`.
@@ -1396,8 +1396,15 @@ Response examples:
 Field notes:
 
 - `refreshToken` (bool): set `true` to force a token refresh.
-- `reloadAuth` (bool): set `true` to reload the managed auth snapshot from disk before reading account details.
+- `reloadAuth` (bool): set `true` to reload the auth storage snapshot before reading account details.
+  Prefer `chatgptAuthTokens` for externally managed account switches; reserve `reloadAuth` for clients
+  that intentionally updated persistent auth storage outside the app-server process.
 - `requiresOpenaiAuth` reflects the active provider; when `false`, Codex can run without OpenAI credentials.
+
+Private fork note: externally managed account pools should stay outside Codex and enter through
+`account/login/start` with `type: "chatgptAuthTokens"`. If Codex receives a 401, it requests
+replacement tokens with `account/chatgptAuthTokens/refresh`, including `previousAccountId` when
+available. See [Fork Account Pool Contract](../../docs/fork-account-pool.md).
 
 ### 2) Log in with an API key
 

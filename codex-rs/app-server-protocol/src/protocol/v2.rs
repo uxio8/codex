@@ -1747,8 +1747,13 @@ pub struct GetAccountParams {
     /// themselves and call `account/login/start` with `chatgptAuthTokens`.
     #[serde(default)]
     pub refresh_token: bool,
-    /// When `true`, reloads the managed auth snapshot from disk before reading
-    /// the current account details.
+    /// When `true`, reloads the auth storage snapshot before reading the current
+    /// account details.
+    ///
+    /// This is intended for clients that update persistent auth outside the
+    /// app-server process. Externally managed account pools should prefer
+    /// `account/login/start` with `chatgptAuthTokens` for normal account
+    /// switches.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub reload_auth: bool,
 }
