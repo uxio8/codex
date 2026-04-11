@@ -1642,6 +1642,9 @@ impl CodexMessageProcessor {
     }
 
     async fn get_account(&self, request_id: ConnectionRequestId, params: GetAccountParams) {
+        if params.reload_auth {
+            self.auth_manager.reload();
+        }
         let do_refresh = params.refresh_token;
 
         self.refresh_token_if_requested(do_refresh).await;

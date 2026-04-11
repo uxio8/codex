@@ -273,6 +273,7 @@ impl AppServerSession {
                 request_id: account_request_id,
                 params: GetAccountParams {
                     refresh_token: false,
+                    reload_auth: false,
                 },
             })
             .await

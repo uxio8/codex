@@ -1581,6 +1581,7 @@ mod tests {
             request_id: RequestId::Integer(6),
             params: v2::GetAccountParams {
                 refresh_token: false,
+                reload_auth: false,
             },
         };
         assert_eq!(

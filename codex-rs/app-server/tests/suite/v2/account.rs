@@ -200,6 +200,7 @@ async fn logout_account_removes_auth_and_notifies() -> Result<()> {
     let get_id = mcp
         .send_get_account_request(GetAccountParams {
             refresh_token: false,
+            reload_auth: false,
         })
         .await?;
     let get_resp: JSONRPCResponse = timeout(
@@ -266,6 +267,7 @@ async fn set_auth_token_updates_account_and_notifies() -> Result<()> {
     let get_id = mcp
         .send_get_account_request(GetAccountParams {
             refresh_token: false,
+            reload_auth: false,
         })
         .await?;
     let get_resp: JSONRPCResponse = timeout(
@@ -333,6 +335,7 @@ async fn account_read_refresh_token_is_noop_in_external_mode() -> Result<()> {
     let get_id = mcp
         .send_get_account_request(GetAccountParams {
             refresh_token: true,
+            reload_auth: false,
         })
         .await?;
     let get_resp: JSONRPCResponse = timeout(
@@ -1452,6 +1455,7 @@ async fn get_account_no_auth() -> Result<()> {
 
     let params = GetAccountParams {
         refresh_token: false,
+        reload_auth: false,
     };
     let request_id = mcp.send_get_account_request(params).await?;
 
@@ -1493,6 +1497,7 @@ async fn get_account_with_api_key() -> Result<()> {
 
     let params = GetAccountParams {
         refresh_token: false,
+        reload_auth: false,
     };
     let request_id = mcp.send_get_account_request(params).await?;
 
@@ -1527,6 +1532,7 @@ async fn get_account_when_auth_not_required() -> Result<()> {
 
     let params = GetAccountParams {
         refresh_token: false,
+        reload_auth: false,
     };
     let request_id = mcp.send_get_account_request(params).await?;
 
@@ -1568,6 +1574,7 @@ async fn get_account_with_chatgpt() -> Result<()> {
 
     let params = GetAccountParams {
         refresh_token: false,
+        reload_auth: false,
     };
     let request_id = mcp.send_get_account_request(params).await?;
 
@@ -1610,6 +1617,7 @@ async fn get_account_with_chatgpt_missing_plan_claim_returns_unknown() -> Result
 
     let params = GetAccountParams {
         refresh_token: false,
+        reload_auth: false,
     };
     let request_id = mcp.send_get_account_request(params).await?;
 
@@ -1624,6 +1632,59 @@ async fn get_account_with_chatgpt_missing_plan_claim_returns_unknown() -> Result
         account: Some(Account::Chatgpt {
             email: "user@example.com".to_string(),
             plan_type: AccountPlanType::Unknown,
+        }),
+        requires_openai_auth: true,
+    };
+    assert_eq!(received, expected);
+    Ok(())
+}
+
+#[tokio::test]
+async fn get_account_can_reload_auth_from_disk() -> Result<()> {
+    let codex_home = TempDir::new()?;
+    create_config_toml(
+        codex_home.path(),
+        CreateConfigTomlParams {
+            requires_openai_auth: Some(true),
+            ..Default::default()
+        },
+    )?;
+    write_chatgpt_auth(
+        codex_home.path(),
+        ChatGptAuthFixture::new("access-chatgpt")
+            .email("first@example.com")
+            .plan_type("pro"),
+        AuthCredentialsStoreMode::File,
+    )?;
+
+    let mut mcp = McpProcess::new_with_env(codex_home.path(), &[("OPENAI_API_KEY", None)]).await?;
+    timeout(DEFAULT_READ_TIMEOUT, mcp.initialize()).await??;
+
+    write_chatgpt_auth(
+        codex_home.path(),
+        ChatGptAuthFixture::new("access-chatgpt-rotated")
+            .email("second@example.com")
+            .plan_type("business"),
+        AuthCredentialsStoreMode::File,
+    )?;
+
+    let params = GetAccountParams {
+        refresh_token: false,
+        reload_auth: true,
+    };
+    let request_id = mcp.send_get_account_request(params).await?;
+
+    let resp: JSONRPCResponse = timeout(
+        DEFAULT_READ_TIMEOUT,
+        mcp.read_stream_until_response_message(RequestId::Integer(request_id)),
+    )
+    .await??;
+    let received: GetAccountResponse = to_response(resp)?;
+
+    let expected = GetAccountResponse {
+        account: Some(Account::Chatgpt {
+            email: "second@example.com".to_string(),
+            plan_type: AccountPlanType::Business,
         }),
         requires_openai_auth: true,
     };

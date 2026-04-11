@@ -1747,6 +1747,10 @@ pub struct GetAccountParams {
     /// themselves and call `account/login/start` with `chatgptAuthTokens`.
     #[serde(default)]
     pub refresh_token: bool,
+    /// When `true`, reloads the managed auth snapshot from disk before reading
+    /// the current account details.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reload_auth: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
