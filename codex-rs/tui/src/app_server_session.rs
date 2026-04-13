@@ -132,6 +132,7 @@ pub(crate) struct ThreadSessionState {
     pub(crate) approvals_reviewer: codex_protocol::config_types::ApprovalsReviewer,
     pub(crate) sandbox_policy: SandboxPolicy,
     pub(crate) cwd: PathBuf,
+    pub(crate) instruction_source_paths: Vec<PathBuf>,
     pub(crate) reasoning_effort: Option<codex_protocol::openai_models::ReasoningEffort>,
     pub(crate) history_log_id: u64,
     pub(crate) history_entry_count: u64,
@@ -994,6 +995,7 @@ async fn thread_session_state_from_thread_start_response(
         response.approvals_reviewer.to_core(),
         response.sandbox.to_core(),
         response.cwd.clone(),
+        response.instruction_sources.clone(),
         response.reasoning_effort,
         config,
     )
@@ -1016,6 +1018,7 @@ async fn thread_session_state_from_thread_resume_response(
         response.approvals_reviewer.to_core(),
         response.sandbox.to_core(),
         response.cwd.clone(),
+        response.instruction_sources.clone(),
         response.reasoning_effort,
         config,
     )
@@ -1038,6 +1041,7 @@ async fn thread_session_state_from_thread_fork_response(
         response.approvals_reviewer.to_core(),
         response.sandbox.to_core(),
         response.cwd.clone(),
+        response.instruction_sources.clone(),
         response.reasoning_effort,
         config,
     )
@@ -1079,6 +1083,7 @@ async fn thread_session_state_from_thread_response(
     approvals_reviewer: codex_protocol::config_types::ApprovalsReviewer,
     sandbox_policy: SandboxPolicy,
     cwd: PathBuf,
+    instruction_source_paths: Vec<PathBuf>,
     reasoning_effort: Option<codex_protocol::openai_models::ReasoningEffort>,
     config: &Config,
 ) -> Result<ThreadSessionState, String> {
@@ -1103,6 +1108,7 @@ async fn thread_session_state_from_thread_response(
         approvals_reviewer,
         sandbox_policy,
         cwd,
+        instruction_source_paths,
         reasoning_effort,
         history_log_id,
         history_entry_count,
@@ -1327,6 +1333,7 @@ mod tests {
             model_provider: "openai".to_string(),
             service_tier: None,
             cwd: PathBuf::from("/tmp/project"),
+            instruction_sources: vec![PathBuf::from("/tmp/project/AGENTS.md")],
             approval_policy: codex_protocol::protocol::AskForApproval::Never.into(),
             approvals_reviewer: codex_app_server_protocol::ApprovalsReviewer::User,
             sandbox: codex_protocol::protocol::SandboxPolicy::new_read_only_policy().into(),
@@ -1337,6 +1344,10 @@ mod tests {
             .await
             .expect("resume response should map");
         assert_eq!(started.session.forked_from_id, Some(forked_from_id));
+        assert_eq!(
+            started.session.instruction_source_paths,
+            response.instruction_sources
+        );
         assert_eq!(started.turns.len(), 1);
         assert_eq!(started.turns[0], response.thread.turns[0]);
     }
@@ -1366,6 +1377,7 @@ mod tests {
             codex_protocol::config_types::ApprovalsReviewer::User,
             SandboxPolicy::new_read_only_policy(),
             PathBuf::from("/tmp/project"),
+            Vec::new(),
             /*reasoning_effort*/ None,
             &config,
         )
@@ -1395,6 +1407,7 @@ mod tests {
             codex_protocol::config_types::ApprovalsReviewer::User,
             SandboxPolicy::new_read_only_policy(),
             PathBuf::from("/tmp/project"),
+            Vec::new(),
             /*reasoning_effort*/ None,
             &config,
         )

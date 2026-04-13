@@ -213,6 +213,7 @@ use codex_core::config_loader::CloudRequirementsLoadErrorCode;
 use codex_core::config_loader::CloudRequirementsLoader;
 use codex_core::config_loader::LoaderOverrides;
 use codex_core::config_loader::load_config_layers_state;
+use codex_core::config_loader::project_trust_key;
 use codex_core::exec::ExecCapturePolicy;
 use codex_core::exec::ExecExpiration;
 use codex_core::exec::ExecParams;
@@ -239,6 +240,7 @@ use codex_core::sandboxing::SandboxPermissions;
 use codex_core::windows_sandbox::WindowsSandboxLevelExt;
 use codex_core::windows_sandbox::WindowsSandboxSetupMode as CoreWindowsSandboxSetupMode;
 use codex_core::windows_sandbox::WindowsSandboxSetupRequest;
+use codex_exec_server::LOCAL_FS;
 use codex_features::FEATURES;
 use codex_features::Feature;
 use codex_features::Stage;
@@ -491,6 +493,23 @@ pub(crate) struct CodexMessageProcessorArgs {
 }
 
 impl CodexMessageProcessor {
+    async fn instruction_sources_from_config(config: &Config) -> Vec<PathBuf> {
+        let mut paths: Vec<PathBuf> = config.user_instructions_path.iter().cloned().collect();
+        match codex_core::discover_project_doc_paths(config, LOCAL_FS.as_ref()).await {
+            Ok(project_doc_paths) => {
+                paths.extend(
+                    project_doc_paths
+                        .into_iter()
+                        .map(|path| path.as_path().to_path_buf()),
+                );
+            }
+            Err(err) => {
+                tracing::warn!(error = %err, "failed to discover project docs for thread response");
+            }
+        }
+        paths
+    }
+
     pub(crate) fn handle_config_mutation(&self) {
         self.clear_plugin_related_caches();
     }
@@ -2276,25 +2295,42 @@ impl CodexMessageProcessor {
         {
             let trust_target = resolve_root_git_project_for_trust(config.cwd.as_path())
                 .unwrap_or_else(|| config.cwd.to_path_buf());
-            if let Err(err) = codex_core::config::set_project_trust_level(
-                &listener_task_context.codex_home,
-                trust_target.as_path(),
-                TrustLevel::Trusted,
-            ) {
-                let error = JSONRPCErrorError {
-                    code: INTERNAL_ERROR_CODE,
-                    message: format!("failed to persist trusted project state: {err}"),
-                    data: None,
-                };
-                listener_task_context
-                    .outgoing
-                    .send_error(request_id, error)
-                    .await;
-                return;
-            }
+            let cli_overrides_with_trust;
+            let cli_overrides_for_reload = if let Err(err) =
+                codex_core::config::set_project_trust_level(
+                    &listener_task_context.codex_home,
+                    trust_target.as_path(),
+                    TrustLevel::Trusted,
+                ) {
+                warn!(
+                    "failed to persist trusted project state for {}; continuing with in-memory trust for this thread: {err}",
+                    trust_target.display()
+                );
+                let mut project = toml::map::Map::new();
+                project.insert(
+                    "trust_level".to_string(),
+                    TomlValue::String("trusted".to_string()),
+                );
+                let mut projects = toml::map::Map::new();
+                projects.insert(
+                    project_trust_key(trust_target.as_path()),
+                    TomlValue::Table(project),
+                );
+                cli_overrides_with_trust = cli_overrides
+                    .iter()
+                    .cloned()
+                    .chain(std::iter::once((
+                        "projects".to_string(),
+                        TomlValue::Table(projects),
+                    )))
+                    .collect::<Vec<_>>();
+                cli_overrides_with_trust.as_slice()
+            } else {
+                &cli_overrides
+            };
 
             config = match derive_config_from_params(
-                &cli_overrides,
+                cli_overrides_for_reload,
                 config_overrides,
                 typesafe_overrides,
                 &cloud_requirements,
@@ -2315,6 +2351,7 @@ impl CodexMessageProcessor {
             };
         }
 
+        let instruction_sources = Self::instruction_sources_from_config(&config).await;
         let dynamic_tools = dynamic_tools.unwrap_or_default();
         let core_dynamic_tools = if dynamic_tools.is_empty() {
             Vec::new()
@@ -2446,6 +2483,7 @@ impl CodexMessageProcessor {
                     model_provider: config_snapshot.model_provider_id,
                     service_tier: config_snapshot.service_tier,
                     cwd: config_snapshot.cwd,
+                    instruction_sources,
                     approval_policy: config_snapshot.approval_policy.into(),
                     approvals_reviewer: config_snapshot.approvals_reviewer.into(),
                     sandbox: config_snapshot.sandbox_policy.into(),
@@ -3884,6 +3922,7 @@ impl CodexMessageProcessor {
         };
 
         let fallback_model_provider = config.model_provider_id.clone();
+        let instruction_sources = Self::instruction_sources_from_config(&config).await;
         let response_history = thread_history.clone();
 
         match self
@@ -3964,6 +4003,7 @@ impl CodexMessageProcessor {
                     model_provider: session_configured.model_provider_id,
                     service_tier: session_configured.service_tier,
                     cwd: session_configured.cwd,
+                    instruction_sources,
                     approval_policy: session_configured.approval_policy.into(),
                     approvals_reviewer: session_configured.approvals_reviewer.into(),
                     sandbox: session_configured.sandbox_policy.into(),
@@ -4122,6 +4162,12 @@ impl CodexMessageProcessor {
                     mismatch_details.join("; ")
                 );
             }
+            let mut config_for_instruction_sources = self.config.as_ref().clone();
+            if let Ok(cwd) = AbsolutePathBuf::try_from(config_snapshot.cwd.clone()) {
+                config_for_instruction_sources.cwd = cwd;
+            }
+            let instruction_sources =
+                Self::instruction_sources_from_config(&config_for_instruction_sources).await;
             let thread_summary = match load_thread_summary_for_rollout(
                 &self.config,
                 existing_thread_id,
@@ -4159,6 +4205,7 @@ impl CodexMessageProcessor {
                     request_id: request_id.clone(),
                     rollout_path: rollout_path.clone(),
                     config_snapshot,
+                    instruction_sources,
                     thread_summary,
                 }),
             );
@@ -4434,6 +4481,7 @@ impl CodexMessageProcessor {
         };
 
         let fallback_model_provider = config.model_provider_id.clone();
+        let instruction_sources = Self::instruction_sources_from_config(&config).await;
 
         let NewThread {
             thread_id,
@@ -4588,6 +4636,7 @@ impl CodexMessageProcessor {
             model_provider: session_configured.model_provider_id,
             service_tier: session_configured.service_tier,
             cwd: session_configured.cwd,
+            instruction_sources,
             approval_policy: session_configured.approval_policy.into(),
             approvals_reviewer: session_configured.approvals_reviewer.into(),
             sandbox: session_configured.sandbox_policy.into(),
@@ -8159,12 +8208,14 @@ async fn handle_pending_thread_resume_request(
         reasoning_effort,
         ..
     } = pending.config_snapshot;
+    let instruction_sources = pending.instruction_sources;
     let response = ThreadResumeResponse {
         thread,
         model,
         model_provider: model_provider_id,
         service_tier,
         cwd,
+        instruction_sources,
         approval_policy: approval_policy.into(),
         approvals_reviewer: approvals_reviewer.into(),
         sandbox: sandbox_policy.into(),

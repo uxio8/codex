@@ -9928,6 +9928,7 @@
           "go",
           "plus",
           "pro",
+          "prolite",
           "team",
           "self_serve_business_usage_based",
           "business",
@@ -12809,6 +12810,14 @@
           "cwd": {
             "type": "string"
           },
+          "instructionSources": {
+            "default": [],
+            "description": "Instruction source files currently loaded for this thread.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "model": {
             "type": "string"
           },
@@ -14098,6 +14107,14 @@
           "cwd": {
             "type": "string"
           },
+          "instructionSources": {
+            "default": [],
+            "description": "Instruction source files currently loaded for this thread.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "model": {
             "type": "string"
           },
@@ -14388,6 +14405,14 @@
           },
           "cwd": {
             "type": "string"
+          },
+          "instructionSources": {
+            "default": [],
+            "description": "Instruction source files currently loaded for this thread.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           },
           "model": {
             "type": "string"
