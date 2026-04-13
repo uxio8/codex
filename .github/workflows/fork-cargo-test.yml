@@ -44,6 +44,12 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@a0b273b48ed29de4470960879e8381ff45632f26 # 1.93.0
 
+      - name: Build Codex test helper binary
+        run: cargo build -p codex-cli --bin codex
+
+      - name: Build Linux sandbox test helper binary
+        run: cargo build -p codex-linux-sandbox --bin codex-linux-sandbox
+
       - name: Enable unprivileged user namespaces
         shell: bash
         run: |
