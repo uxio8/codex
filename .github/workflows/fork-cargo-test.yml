@@ -50,6 +50,17 @@ jobs:
       - name: Build Linux sandbox test helper binary
         run: cargo build -p codex-linux-sandbox --bin codex-linux-sandbox
 
+      - name: Install sandbox-visible test helper binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo install -m 0755 target/debug/codex /usr/local/bin/codex
+          sudo install -m 0755 target/debug/codex-linux-sandbox /usr/local/bin/codex-linux-sandbox
+          {
+            echo "CARGO_BIN_EXE_codex=/usr/local/bin/codex"
+            echo "CARGO_BIN_EXE_codex_linux_sandbox=/usr/local/bin/codex-linux-sandbox"
+          } >> "$GITHUB_ENV"
+
       - name: Enable unprivileged user namespaces
         shell: bash
         run: |
@@ -58,6 +69,9 @@ jobs:
           if sudo sysctl -a 2>/dev/null | grep -q '^kernel.apparmor_restrict_unprivileged_userns'; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
+
+      - name: Run exec-server file system sandbox tests
+        run: cargo test -p codex-exec-server --test file_system
 
       - name: Run full Cargo test suite
         run: cargo test
