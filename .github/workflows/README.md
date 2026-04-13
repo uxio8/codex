@@ -26,6 +26,13 @@ The workflows in this directory are split so that pull requests get fast, review
   - cross-platform `argument-comment-lint`
   - Linux remote-env tests
 
+## Fork Maintenance
+
+- `fork-ci.yml` keeps fork-only checks small and safe for every push.
+- `fork-cargo-test.yml` is a manual fork-only workflow for running the full Cargo
+  test suite in a clean GitHub Actions Linux runner when local sandbox state might
+  affect results.
+
 ## Rule Of Thumb
 
 - If a build/test/clippy check can be expressed in Bazel, prefer putting the PR-time version in `bazel.yml`.
