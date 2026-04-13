@@ -1,6 +1,6 @@
 {
-    // Force the VS Code ChatGPT/Codex extension to use the local checkout.
-    "chatgpt.cliExecutable": "${workspaceFolder}/scripts/debug-codex.sh",
+    // Force the VS Code ChatGPT/Codex extension to go through the account pool.
+    "chatgpt.cliExecutable": "/Users/uxiomarcosmacmini/Documents/desarrollos/codex-pool-cloud/scripts/debug-poolctl-codex.sh",
     "rust-analyzer.checkOnSave": true,
     "rust-analyzer.check.command": "clippy",
     "rust-analyzer.check.extraArgs": ["--tests"],
