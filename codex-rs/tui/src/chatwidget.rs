@@ -1329,6 +1329,7 @@ fn hook_run_summary_from_notification(
         execution_mode: run.execution_mode.to_core(),
         scope: run.scope.to_core(),
         source_path: run.source_path,
+        source: run.source.to_core(),
         display_order: run.display_order,
         status: run.status.to_core(),
         status_message: run.status_message,
@@ -6648,6 +6649,7 @@ impl ChatWidget {
             | EventMsg::PlanDelta(_)
             | EventMsg::AgentReasoningDelta(_)
             | EventMsg::TerminalInteraction(_)
+            | EventMsg::PatchApplyUpdated(_)
             | EventMsg::ExecCommandOutputDelta(_) => {}
             _ => {
                 tracing::trace!("handle_codex_event: {:?}", msg);
@@ -6863,6 +6865,7 @@ impl ChatWidget {
             EventMsg::RawResponseItem(_)
             | EventMsg::ItemStarted(_)
             | EventMsg::AgentMessageContentDelta(_)
+            | EventMsg::PatchApplyUpdated(_)
             | EventMsg::ReasoningContentDelta(_)
             | EventMsg::ReasoningRawContentDelta(_)
             | EventMsg::DynamicToolCallRequest(_)
