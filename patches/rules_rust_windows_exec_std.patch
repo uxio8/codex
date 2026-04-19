@@ -18,7 +18,7 @@ diff --git a/rust/toolchain.bzl b/rust/toolchain.bzl
 @@ -315,6 +316,14 @@
          # Made available to support $(location) expansion in stdlib_linkflags and extra_rustc_flags.
          transitive_file_sets.append(depset(ctx.files.rust_std))
- 
+
 +    sysroot_exec_rust_std = None
 +    if exec_rust_std:
 +        sysroot_exec_rust_std = _symlink_sysroot_tree(ctx, name, exec_rust_std)
@@ -48,10 +48,10 @@ diff --git a/rust/toolchain.bzl b/rust/toolchain.bzl
          rustc_lib = sysroot_rustc_lib,
 @@ -412,12 +423,14 @@
          )
- 
+
      rust_std = ctx.attr.rust_std
 +    exec_rust_std = ctx.attr.exec_rust_std if ctx.attr.exec_rust_std else rust_std
- 
+
      sysroot = _generate_sysroot(
          ctx = ctx,
          rustc = ctx.file.rustc,
@@ -62,12 +62,12 @@ diff --git a/rust/toolchain.bzl b/rust/toolchain.bzl
          rustfmt = ctx.file.rustfmt,
          clippy = ctx.file.clippy_driver,
 @@ -454,7 +467,7 @@
- 
+
      expanded_stdlib_linkflags = _expand_flags(ctx, "stdlib_linkflags", rust_std[rust_common.stdlib_info].srcs, make_variables)
      expanded_extra_rustc_flags = _expand_flags(ctx, "extra_rustc_flags", rust_std[rust_common.stdlib_info].srcs, make_variables)
 -    expanded_extra_exec_rustc_flags = _expand_flags(ctx, "extra_exec_rustc_flags", rust_std[rust_common.stdlib_info].srcs, make_variables)
 +    expanded_extra_exec_rustc_flags = _expand_flags(ctx, "extra_exec_rustc_flags", exec_rust_std[rust_common.stdlib_info].srcs, make_variables)
- 
+
      linking_context = cc_common.create_linking_context(
          linker_inputs = depset([
 @@ -807,6 +820,10 @@
@@ -122,13 +122,13 @@ diff --git a/rust/private/rustc.bzl b/rust/private/rustc.bzl
 @@ -1010,7 +1010,10 @@
      if build_metadata and not use_json_output:
          fail("build_metadata requires parse_json_output")
- 
+
 -    use_exec_target = is_exec_configuration(ctx) and crate_info.type == "bin"
 +    # Exec-configuration crates (build scripts, proc-macros, and their
 +    # dependencies) must all target the exec triple so they can link against
 +    # each other and the exec-side standard library.
 +    use_exec_target = is_exec_configuration(ctx)
- 
+
      output_dir = getattr(crate_info.output, "dirname", None)
      linker_script = getattr(file, "linker_script", None)
 diff --git a/rust/repositories.bzl b/rust/repositories.bzl
@@ -137,7 +137,7 @@ diff --git a/rust/repositories.bzl b/rust/repositories.bzl
 @@ -574,6 +574,18 @@
      build_components.append(rust_stdlib_content)
      sha256s.update(rust_stdlib_sha256)
- 
+
 +    exec_rust_std_label = None
 +    if exec_triple.str != target_triple.str:
 +        exec_rust_stdlib_content, exec_rust_stdlib_sha256 = load_rust_stdlib(
@@ -173,6 +173,6 @@ diff --git a/rust/repositories.bzl b/rust/repositories.bzl
 +                iso_date = iso_date,
 +            )
 +            sha256s.update(exec_rustc_dev_sha256)
- 
+
      ctx.file("WORKSPACE.bazel", """workspace(name = "{}")""".format(
          ctx.name,
