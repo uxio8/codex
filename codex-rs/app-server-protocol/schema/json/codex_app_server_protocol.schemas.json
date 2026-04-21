@@ -14103,8 +14103,8 @@
               },
               "namespace": {
                 "type": [
-                  "null",
-                  "string"
+                  "string",
+                  "null"
                 ]
               },
               "status": {
