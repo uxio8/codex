@@ -28,6 +28,15 @@ jobs:
               "${{ github.event.pull_request.base.sha }}" \
               "${{ github.event.pull_request.head.sha }}" \
               -- . ':(exclude)**/*.snap'
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            default_branch='${{ github.event.repository.default_branch }}'
+            default_ref="refs/remotes/origin/$default_branch"
+            if ! git rev-parse --verify "$default_ref" >/dev/null 2>&1; then
+              git fetch origin "$default_branch:$default_ref"
+            fi
+
+            base_sha="$(git merge-base "$default_ref" "${{ github.sha }}")"
+            git diff --check "$base_sha" "${{ github.sha }}" -- . ':(exclude)**/*.snap'
           elif [[ "${{ github.event.before }}" =~ ^0+$ ]]; then
             git diff-tree --check --root "${{ github.sha }}" -- . ':(exclude)**/*.snap'
           else
