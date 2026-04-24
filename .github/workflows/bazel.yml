@@ -222,10 +222,11 @@ jobs:
           - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
           - os: macos-15-xlarge
+            fork_os: macos-15
             target: aarch64-apple-darwin
           - os: windows-latest
             target: x86_64-pc-windows-gnullvm
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ github.repository == 'openai/codex' && matrix.os || matrix.fork_os || matrix.os }}
     name: Verify release build on ${{ matrix.os }} for ${{ matrix.target }}
 
     steps:
