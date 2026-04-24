@@ -1595,6 +1595,7 @@ region = "us-west-2"
 
     let params = GetAccountParams {
         refresh_token: false,
+        reload_auth: false,
     };
     let request_id = mcp.send_get_account_request(params).await?;
 
